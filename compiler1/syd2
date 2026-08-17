@@ -1,0 +1,857 @@
+%{
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
+#include "defs.h"
+#define DEBUG 0
+
+#define SYM_TABLE_SIZE 41   // μέγεθος πίνακα κατακερματισμού για σύμβολα
+#define NAME_MAX  32        // μέγιστο μήκος ονόματος μεταβλητής/μεθόδου
+#define MAX_LOCAL_VARS 100  // μέγιστος αριθμός τοπικών μεταβλητών
+
+// Δημιουργία κόμβου στο AST
+AstNode *MkNode(int tipos, symbol *sn, AstNode *z0, AstNode *z1, AstNode *z2, AstNode *z3);
+void yyerror(char *s);
+// Συνάρτηση για την εκτύπωση του AST
+void traverse(AstNode *p, int n); 
+
+// Ορισμός πίνακα κατακερματισμού για το Symbol Table
+typedef struct hash_tab {
+   int numbsymbols;
+   symbol *table[SYM_TABLE_SIZE];
+} HASH_TAB;
+
+AstNode* TreeRoot;       // Ρίζα του AST (πρόγραμμα)
+symbol *SymbolTable = NULL;
+symbol *p;
+
+int yyparse();           // parser (δημιουργείται από bison/yacc)
+int yylex();             // lexer (δημιουργείται από flex)
+
+#define STACKSIZE 200
+
+symbol *vs[STACKSIZE];
+int TopOfStack = -1;
+
+void push_vs(symbol *p) {
+    if (TopOfStack >= STACKSIZE - 1) {
+       
+        exit(1);
+    }
+    vs[++TopOfStack] = p;
+}
+
+symbol *pop_vs(void) {
+    if (TopOfStack < 0) {
+       
+        exit(1);
+    }
+    return vs[TopOfStack--];
+}
+
+symbol *top_vs(void) {
+    if (TopOfStack < 0) return NULL;
+    return vs[TopOfStack];
+}
+
+// Αντιγραφή περιεχομένων συμβόλου (χωρίς τα links)
+void copy_symbol(symbol *dest, symbol *src) {
+    if (!dest || !src) return;
+
+    strcpy((char *)dest->name, (char *)src->name);
+    strcpy(dest->scope_name, src->scope_name);
+
+    dest->timi       = src->timi;
+    dest->disposable = src->disposable;
+    dest->lvalue     = src->lvalue;
+    dest->typos      = src->typos;
+
+    // Δεν αντιγράφουμε τους pointers που συνδέουν λίστες συμβόλων
+    dest->Next_in_Cross_Link = NULL;
+    dest->NextSymbol         = NULL;
+    dest->PrevSymbol         = NULL;
+}
+
+// Διαγραφή συμβόλου (μόνο αν είναι disposable)
+void discard_symbol(symbol *s) {
+    if (!s) return;
+    if (s->disposable) {
+        free(s);
+    }
+}
+%}
+
+// Ορισμός τύπων που μπορεί να έχει ένα token ή μη τερματικό
+%union {
+    int   yint;                 // ακέραια τιμή
+    char  *ystr;                // string (ονόματα)
+    int   nonterm;              // για ενδιάμεσα
+    struct AstNode *stnode;     // δείκτης σε κόμβο AST
+}
+
+
+// Tokens
+%token  '(' ')' '{' '}' ';' ',' 
+%token <ystr> AND ELSE IF INT NOT OR PRINT READ WHILE MAIN
+%token <yint> DEC_CONST
+%token <ystr> ID
+%token RETURN BREAK
+%token GE LE EQ NE
+%token TRUE FALSE VOID
+
+// Τύποι μη τερματικών που επιστρέφουν AST nodes
+%type <stnode> Program MethList METH TYPE Params Body FORMALS Decls DeclList Decl Stmts Stmt Expr Vars Assign Block Location
+%type <stnode> METHOD AddExpr Term Factor Actuals Args
+%type <stnode> Relop Addop Mulop
+%%
+
+// ======= ΚΑΝΟΝΕΣ ΣΥΝΤΑΚΤΙΚΗΣ ΑΝΑΛΥΣΗΣ =======
+
+
+Program:
+      /* empty */ { $$ = NULL; }
+    | MethList   { $$ = MkNode(N_PROGRAM, NULL, $1, NULL, NULL, NULL); TreeRoot = $$; }
+;
+
+MethList:
+      METH MethList { $$ = MkNode(N_METHLIST, NULL, $1, $2, NULL, NULL); }
+    | METH          { $$ = $1; }
+;
+
+METH:
+      TYPE ID '(' Params ')' Body {
+          symbol *s = new_symbol($2);   // δημιουργία συμβόλου για τη μέθοδο
+          s->typos = INT;
+          s->timi = -1;
+          s->num_params = count_parameters($4); // υπολογισμός παραμέτρων
+
+          $$ = MkNode(N_METH, NULL, $1,
+                      MkNode(N_ID, s, NULL, NULL, NULL, NULL),
+                      $4, $6);
+      }
+;
+
+Params:
+      /* empty */ { $$ = NULL; }
+    | FORMALS TYPE ID {
+          symbol *s = new_symbol($3); // νέα παράμετρος
+          s->typos = INT;
+          s->timi = 0;
+          $$ = MkNode(N_PARAM, NULL, $1, $2,
+                      MkNode(N_ID, s, NULL, NULL, NULL, NULL), NULL);
+      }
+;
+
+
+FORMALS:
+      FORMALS TYPE ID ',' {
+          symbol *s = new_symbol($3);
+          s->typos = INT;
+          s->timi = 0;
+          $$ = MkNode(N_FORMALS, NULL, $1, $2,
+                      MkNode(N_ID, s, NULL, NULL, NULL, NULL), NULL);
+      }
+    | /* empty */ { $$ = NULL; }
+;
+
+
+TYPE:
+      INT { $$ = MkNode(N_TYPE, NULL, NULL, NULL, NULL, NULL); }
+;
+
+
+Body:
+      '{' Decls Stmts '}' { $$ = MkNode(N_BODY, NULL, $2, $3, NULL, NULL); }
+;
+
+Decls:
+      DeclList Decl { $$ = MkNode(N_DECLS, NULL, $1, $2, NULL, NULL); }
+    | /* empty */ { $$ = NULL; }
+;
+
+
+DeclList:
+      DeclList Decl { $$ = MkNode(N_DECLLIST, NULL, $1, $2, NULL, NULL); }
+    | /* empty */ { $$ = NULL; }
+;
+
+
+Decl:
+      TYPE ID Vars ';' {
+          symbol *s = new_symbol($2);  // νέο σύμβολο για μεταβλητή
+          s->typos = INT;
+          s->timi = 0;
+          strncpy(s->scope_name, "current_scope", NAME_MAX);
+
+          $$ = MkNode(N_DECL, NULL, $1,
+                      MkNode(N_ID, s, NULL, NULL, NULL, NULL), $3, NULL);
+      }
+    | TYPE ID '=' Expr Vars ';' {
+          symbol *s = new_symbol($2);
+          s->typos = INT;
+          s->timi = $4->value; // αρχικοποίηση με έκφραση
+          $$ = MkNode(N_DECL, NULL, $1,
+                      MkNode(N_ID, s, NULL, NULL, NULL, NULL), $4, $5);
+      }
+;
+
+
+Vars:
+      ',' ID Vars {
+          symbol *s = new_symbol($2);
+          s->typos= INT; s->timi=0;
+          $$ = MkNode(N_VARS, NULL,
+                      MkNode(N_ID, s, NULL, NULL, NULL, NULL),
+                      $3, NULL, NULL);
+      }
+    | ',' ID '=' Expr Vars {
+          symbol *s = new_symbol($2);
+          s->typos= INT; s->timi = $4->value;
+          $$ = MkNode(N_VARS, NULL,
+                      MkNode(N_ID, s, NULL, NULL, NULL, NULL),
+                      $4, $5, NULL);
+      }
+    | /* empty */ { $$ = NULL; }
+;
+
+
+Stmts:
+      Stmts Stmt { $$ = MkNode(N_STMTS, NULL, $1, $2, NULL, NULL); }
+    | /* empty */ { $$ = NULL; }
+;
+
+
+Stmt:
+      Assign ';' { $$ = MkNode(N_ASSIGN, NULL, $1, NULL, NULL, NULL); }
+    | RETURN Expr ';' { $$ = MkNode(N_RETURN, NULL, $2, NULL, NULL, NULL); }
+    | IF '(' Expr ')' Stmt ELSE Stmt { $$ = MkNode(N_IF, NULL, $3, $5, $7, NULL); }
+    | WHILE '(' Expr ')' Stmt { $$ = MkNode(N_WHILE, NULL, $3, $5, NULL, NULL); }
+    | BREAK ';' { $$ = MkNode(N_BREAK, NULL, NULL, NULL, NULL, NULL); }
+    | Block { $$ = $1; }
+    | ';' { $$ = NULL; }
+;
+
+
+Block:
+      '{' Stmts '}' { $$ = MkNode(N_BLOCK, NULL, $2, NULL, NULL, NULL); }
+;
+
+
+Assign:
+      Location '=' Expr {
+          $$ = MkNode(N_ASSIGN, NULL, $1, $3, NULL, NULL);
+          if ($1->SymbolNode && $3) $1->SymbolNode->timi = $3->value; // ενημέρωση τιμής
+      }
+;
+
+
+Location:
+      ID { 
+          symbol *s = new_symbol($1); 
+          s->typos = INT; 
+          s->timi = 0; 
+          $$ = MkNode(N_ID, s, NULL, NULL, NULL, NULL); 
+      }
+;
+
+
+Expr:
+      AddExpr Relop AddExpr { $$ = MkNode(N_RELOP, NULL, $1, $2, $3, NULL); }
+    | AddExpr { $$ = $1; }
+;
+
+
+Relop:
+      LE { $$ = MkNode(N_LE, NULL, NULL, NULL, NULL, NULL); }
+    | '<' { $$ = MkNode(N_LT, NULL, NULL, NULL, NULL, NULL); }
+    | '>' { $$ = MkNode(N_GT, NULL, NULL, NULL, NULL, NULL); }
+    | GE { $$ = MkNode(N_GE, NULL, NULL, NULL, NULL, NULL); }
+    | EQ { $$ = MkNode(N_EQ, NULL, NULL, NULL, NULL, NULL); }
+    | NE { $$ = MkNode(N_NE, NULL, NULL, NULL, NULL, NULL); }
+;
+
+
+AddExpr:
+      AddExpr Addop Term { $$ = MkNode(N_ADDOP, NULL, $1, $2, $3, NULL); }
+    | Term { $$ = $1; }
+;
+
+Addop:
+      '+' { $$ = MkNode(N_PLUS, NULL, NULL, NULL, NULL, NULL); }
+    | '-' { $$ = MkNode(N_MINUS, NULL, NULL, NULL, NULL, NULL); }
+;
+
+
+Term:
+      Term Mulop Factor {
+          symbol *op2 = pop_vs();
+          symbol *op1 = pop_vs();
+
+          if ($2->NodeType == N_DIV) {
+              $$ = MkNode(N_DIV, NULL, $1, $3, NULL, NULL);
+              push_vs(check_divop(op1, op2)); // έλεγχος διαίρεσης
+          } else if ($2->NodeType == N_MUL) {
+              $$ = MkNode(N_MUL, NULL, $1, $3, NULL, NULL);
+              //push_vs(check_multop(op1, op2)); // έλεγχος πολλαπλασιασμού (προαιρετικός)
+          }
+      }
+    | Factor { $$ = $1; }
+;
+
+Mulop:
+      '*' { $$ = MkNode(N_MUL, NULL, NULL, NULL, NULL, NULL); }
+    | '/' { $$ = MkNode(N_DIV, NULL, NULL, NULL, NULL, NULL); }
+;
+
+Factor:
+      '(' Expr ')' { $$ = $2; }
+    | Location { 
+          $$ = $1; 
+          if ($1 && $1->SymbolNode) {
+              push_vs($1->SymbolNode);   // βάζει το symbol της μεταβλητής στη στοίβα
+          }
+      }
+    | DEC_CONST { 
+          // Δημιουργία προσωρινού συμβόλου για σταθερά
+          symbol *s = new_symbol("const");
+          s->timi = $1;        
+          s->disposable = 1;   // να απελευθερωθεί μετά
+          s->lvalue = 0;       // δεν είναι lvalue
+          push_vs(s);          
+
+          $$ = MkNode(N_CONST, NULL, NULL, NULL, NULL, NULL);
+          $$->value = $1;
+      }
+    | METHOD '(' Actuals ')' { $$ = MkNode(N_CALL, NULL, $1, $3, NULL, NULL); }
+    | TRUE { symbol *s = new_symbol("true");
+             s->typos= INT; s->timi=1;
+             $$=MkNode(N_BOOL,s,NULL,NULL,NULL,NULL);
+             $$->value = 1; }
+       
+    | FALSE { symbol *s = new_symbol("false");
+              s->typos= INT; s->timi=0;
+              $$=MkNode(N_BOOL,s,NULL,NULL,NULL,NULL);
+              $$->value = 0; }
+;
+
+
+METHOD:
+      ID { 
+          symbol* s = new_symbol($1);  // νέο σύμβολο για μέθοδο
+          $$ = MkNode(N_METHOD, s, NULL, NULL, NULL, NULL); 
+      }
+;
+
+
+Actuals:
+      Args Expr { $$ = MkNode(N_ARGS, NULL, $1, $2, NULL, NULL); }
+    | /* empty */ { $$ = NULL; }
+;
+
+	
+Args:
+      Args Expr ',' { $$ = MkNode(N_ARGS, NULL, $1, $2, NULL, NULL); }
+    | /* empty */ { $$ = NULL; }
+;
+%%
+
+
+/*Η MkNode δημιουργεί δυναμικά έναν κόμβο AST, αρχικοποιεί τον τύπο του κόμβου (NodeType), συνδέει το 
+συμβολικό δείκτη (SymbolNode) και αντιγράφει τους τέσσερις δείκτες παιδιών που της δίνονται (z0..z3). Επίσης 
+αρχικοποιεί την value στο 0. Χρησιμοποιείται παντού στον parser για να χτίσει το δέντρο σύνταξης.
+*/
+AstNode *MkNode(int tipos,symbol *sn,AstNode *z0,AstNode *z1,AstNode *z2,AstNode *z3) {
+   /* Δημιουργεί και επιστρέφει ένα νέο AstNode.
+      Παραλαμβάνει:
+        - tipos: ο κωδικός/τύπος κόμβου (π.χ. N_METH, N_ID ...)
+        - sn: δείκτης σε symbol (π.χ. για N_ID ή N_METHOD)
+        - z0..z3: δείκτες σε έως τέσσερα παιδιά (μπορεί να είναι NULL)
+   */
+   AstNode *p=(AstNode *)malloc(sizeof(AstNode)); // Δέσμευση μνήμης
+   p->NodeType=tipos;           // Θέτουμε τον τύπο του κόμβου
+   p->SymbolNode=sn;           // Θέτουμε το σχετικό symbol (αν υπάρχει)
+   p->pAstNode[0]=z0;          // Συνδέουμε το 1ο παιδί
+   p->pAstNode[1]=z1;          // Συνδέουμε το 2ο παιδί
+   p->pAstNode[2]=z2;          // Συνδέουμε το 3ο παιδί
+   p->pAstNode[3]=z3;          // Συνδέουμε το 4ο παιδί
+   p->value=0;                 // Προεπιλεγμένη τιμή (χρήσιμο για σταθερές)
+   return(p);                  // Επιστρέφουμε τον νέο κόμβο
+}
+
+
+/*Η new_symbol δημιουργεί και αρχικοποιεί ένα νέο symbol δομής για ένα όνομα (π.χ. μεταβλητής ή μεθόδου). 
+Αντιγράφει το όνομα μέσα στο πεδίο name (με όριο NAME_MAX), αρχικοποιεί timi, lvalue, typos, καθαρίζει το 
+scope_name και τις συνδέσεις NextSymbol/PrevSymbol. Επιστρέφει τον καινούριο συμβολισμό.
+*/
+symbol* new_symbol(const char* name) {
+    /* Δημιουργεί ένα νέο symbol με αρχικές προδιαγραφές.
+       Χρησιμοποιείται σε δηλώσεις ID, σε δημιουργία const temporaries κ.λπ.
+    */
+    symbol* s = (symbol*)malloc(sizeof(symbol));   // Δέσμευση μνήμης για το symbol
+    // Αντιγραφή ονόματος με όριο NAME_MAX και τερματισμό '\0'
+    strncpy((char*)s->name, name, NAME_MAX);
+    s->name[NAME_MAX-1] = 0;
+
+    // Αρχικές τιμές
+    s->timi = 0;           // τιμή/αρχικοποίηση = 0 (προεπιλογή)
+    s->lvalue = 1;         // προεπιλεγμένο ότι είναι lvalue (μπορεί να αλλάξει)
+    s->typos = 0;          // τύπος άγνωστος/προεπιλογή
+    s->scope_name[0] = '\0'; // δεν έχει scope ακόμα
+    s->NextSymbol = NULL;  // δεν είναι συνδεδεμένο στη λίστα
+    s->PrevSymbol = NULL;
+    return s;              // επιστρέφει το νέο symbol
+}
+
+/*Η addsymb προσθέτει ένα symbol στην global (σύνδετη) λίστα SymbolTable. 
+Αν το SymbolTable είναι κενό, το νέο symbol γίνεται η αρχή της λίστας. Αλλιώς 
+προστίθεται στο τέλος της συνδεδεμένης λίστας
+*/
+void addsymb(symbol* s) {
+    if (!s) return; // Αν δεν υπάρχει symbol, τίποτα να κάνουμε
+
+    if (!SymbolTable) {
+        // Αν ο πίνακας είναι κενός, το s γίνεται η πρώτη εγγραφή
+        SymbolTable = s;
+    } else {
+        // Διασχίζουμε μέχρι το τέλος της λίστας και προσθέτουμε το s
+        symbol* p = SymbolTable;
+        while (p->NextSymbol) p = p->NextSymbol; // πηγαίνουμε στο τελευταίο
+        p->NextSymbol = s;       // συνδέουμε το νέο στο τέλος
+        s->PrevSymbol = p;       // οπισθιοσύνδεσμος
+    }
+}
+
+/*Η findsymb ψάχνει τη συνδεδεμένη λίστα SymbolTable για συμβολο με συγκεκριμένο 
+name και συγκεκριμένο scope. Επιστρέφει τον δείκτη στο symbol αν βρεθεί, αλλιώς NULL. 
+Χρησιμοποιείται για να αποφευχθούν διπλές δηλώσεις στο ίδιο scope και για να εντοπιστούν 
+μεταβλητές/μέθοδοι κατά τον έλεγχο.
+*/
+symbol* findsymb(const char* name, const char* scope) {
+    // Ξεκινάμε από την αρχή της λίστας και ψάχνουμε για ίδιο όνομα ΚΑΙ ίδιο scope
+    symbol* p = SymbolTable;
+    while (p) {
+        if (strcmp(p->name, name) == 0 && strcmp(p->scope_name, scope) == 0) {
+            return p; // βρέθηκε ίδια μεταβλητή στο ίδιο scope
+        }
+        p = p->NextSymbol; // πηγαίνουμε στον επόμενο symbol
+    }
+    return NULL; // δεν βρέθηκε
+}
+
+/*Η βοηθητική type_to_string μετατρέπει τον ακέραιο κωδικό τύπου (INT, VOID κ.λπ.) σε 
+ανθρώπινη αναγνωρίσιμη συμβολοσειρά. Χρησιμοποιείται για εμφάνιση στον πίνακα συμβόλων 
+(print_symbol_table).
+*/
+const char* type_to_string(int t) {
+    switch(t) {
+        case INT: return "int";
+        case VOID: return "void";
+        default: return "unknown"; // αν δεν αναγνωρίσουμε τον κωδικό
+    }
+}
+
+/*Η συνάρτηση build_symbol_table είναι υπεύθυνη για τη δημιουργία του πίνακα συμβόλων (symbol table) 
+με βάση το Abstract Syntax Tree (AST). Ο πίνακας συμβόλων κρατάει πληροφορίες για όλες τις δηλώσεις 
+μεταβλητών και μεθόδων, όπως το όνομα, το scope και την αρχική τιμή. Η συνάρτηση δουλεύει αναδρομικά: ξεκινάει από 
+έναν κόμβο του AST και ανάλογα με τον τύπο του (μέθοδος, παράμετρος, δήλωση μεταβλητής, λίστα μεταβλητών, κλπ.) 
+ενημερώνει τον πίνακα συμβόλων και μετά συνεχίζει στους υποκόμβους. Επίσης, κάνει έλεγχο για διπλές δηλώσεις μέσα 
+στο ίδιο scope και τερματίζει το πρόγραμμα αν εντοπιστεί σφάλμα. Με αυτόν τον τρόπο εξασφαλίζεται ότι το πρόγραμμα 
+έχει σωστά scopes και μοναδικές δηλώσεις.
+*/
+void build_symbol_table(AstNode* node, const char* current_scope) {
+    // Αν ο κόμβος είναι NULL (δηλ. δεν υπάρχει), σταματάμε
+    if (!node) return;
+
+    switch (node->NodeType) {
+        case N_METH: {
+            // --- Μέθοδος ---
+            // Παίρνουμε το σύμβολο της μεθόδου (το ID της)
+            symbol* method_sym = node->pAstNode[1]->SymbolNode;
+            // Οι μέθοδοι ανήκουν πάντα στο global scope
+            strncpy(method_sym->scope_name, "global", NAME_MAX);
+            // Προσθήκη της μεθόδου στον πίνακα συμβόλων
+            addsymb(method_sym);
+
+            // Επεξεργασία παραμέτρων και σώματος με το όνομα της μεθόδου ως νέο scope
+            build_symbol_table(node->pAstNode[2], method_sym->name); // Params
+            build_symbol_table(node->pAstNode[3], method_sym->name); // Body
+            break;
+        }
+
+        case N_PARAM:
+        case N_FORMALS: {
+            // --- Παράμετροι μεθόδου ---
+            // Έλεγχος αν υπάρχει ID στη δήλωση
+            if (node->pAstNode[2] && node->pAstNode[2]->NodeType == N_ID) {
+                symbol* s = node->pAstNode[2]->SymbolNode;
+                // Αν η παράμετρος δεν έχει ήδη δηλωθεί στο ίδιο scope, την προσθέτουμε
+                if (!findsymb(s->name, current_scope)) {
+                    strncpy(s->scope_name, current_scope, NAME_MAX);
+                    addsymb(s);
+                }
+            }
+            // Συνεχίζουμε αναδρομικά και με τις άλλες παραμέτρους
+            build_symbol_table(node->pAstNode[0], current_scope);
+            build_symbol_table(node->pAstNode[1], current_scope);
+            break;
+        }
+        
+
+        case N_DECL: {
+    // --- Δήλωση μεταβλητής ---
+    if (node->pAstNode[1] && node->pAstNode[1]->NodeType == N_ID) {
+        symbol* s = node->pAstNode[1]->SymbolNode;
+
+        if (!findsymb(s->name, current_scope)) {
+            strncpy(s->scope_name, current_scope, NAME_MAX);
+
+            // Έλεγχος αρχικοποίησης (προσοχή στο NodeType)
+            if (node->pAstNode[2]) {
+                if (node->pAstNode[2]->NodeType == N_CONST || node->pAstNode[2]->NodeType == N_BOOL) {
+                    s->timi = node->pAstNode[2]->value;
+                } 
+                else {
+                    // Δεν είναι σταθερά, μάλλον είναι VARS ή expression -> default 0
+                    s->timi = 0;
+                }
+            } else {
+                s->timi = 0;
+            }
+
+            addsymb(s);
+        } else {
+            fprintf(stderr, "Error: Double declaration of variable '%s' in scope '%s'\n",
+                    s->name, current_scope);
+            fflush(stderr);
+            exit(1);
+        }
+    }
+
+    // Πολύ σημαντικό: πρέπει ΠΑΝΤΑ να συνεχίσουμε την αναδρομή
+    build_symbol_table(node->pAstNode[2], current_scope); 
+    break;
+}
+
+        case N_VARS: {
+            // --- Λίστα μεταβλητών ---
+            AstNode* current = node;
+            // Διατρέχουμε όλη τη λίστα μεταβλητών (comma-separated)
+            while (current && current->NodeType == N_VARS) {
+                // Παίρνουμε το ID της τρέχουσας μεταβλητής
+                AstNode* idNode = current->pAstNode[0];
+                if (idNode && idNode->NodeType == N_ID) {
+                    symbol* s = idNode->SymbolNode;
+                    // Αν δεν υπάρχει ήδη στο scope, την προσθέτουμε
+                    if (!findsymb(s->name, current_scope)) {
+                        strncpy(s->scope_name, current_scope, NAME_MAX);
+                        // Έλεγχος αν έχει αρχικοποίηση
+                        AstNode* maybeExpr = current->pAstNode[1];
+                        if (maybeExpr && maybeExpr->NodeType == N_CONST)
+                            s->timi = maybeExpr->value;
+                        else
+                            s->timi = 0;
+                        addsymb(s);
+                    } else {
+                        // Σφάλμα: διπλή δήλωση
+                        fprintf(stderr, "Error: Double declaration of variable '%s' in scope '%s'\n",
+                                s->name, current_scope);
+                        fflush(stderr);
+                        exit(1);
+                    }
+                }
+                // Προχωράμε στην επόμενη μεταβλητή της λίστας
+                if (current->pAstNode[2] && current->pAstNode[2]->NodeType == N_VARS)
+                    current = current->pAstNode[2];
+                else if (current->pAstNode[1] && current->pAstNode[1]->NodeType == N_VARS)
+                    current = current->pAstNode[1];
+                else
+                    break;
+            }
+            break;
+        }
+
+        default: {
+            // --- Γενική περίπτωση ---
+            // Για όλους τους άλλους κόμβους, κάνουμε αναδρομή σε όλα τα παιδιά
+            for (int i = 0; i < 4; i++)
+                build_symbol_table(node->pAstNode[i], current_scope);
+            break;
+        }
+    }
+}
+
+/*Εκτυπώνει την τρέχουσα λίστα SymbolTable σε απλό πίνακα (scope, όνομα, τύπος, τιμή). 
+Χρησιμοποιεί την type_to_string για να εμφανίσει τον τύπο σαν string.
+*/
+void print_symbol_table() {
+    printf("\n--- Symbol Table ---\n");
+    symbol* p = SymbolTable;
+    while (p) {
+        printf("Scope: %-10s | Name: %-10s | Type: %-4s | Value: %d\n ",
+               p->scope_name, p->name, type_to_string(p->typos), p->timi);
+        p = p->NextSymbol; 
+    }
+}
+
+//Απλή συνάρτηση παροχής σφαλμάτων για τον parser
+void yyerror(char *s)
+{
+   fputs(s,stderr); putc('\n',stderr);
+}
+
+/*Ελέγχει αν ένα όνομα είναι δεσμευμένη λέξη της γλώσσας (π.χ. int, if, main κ.λπ.). 
+Επιστρέφει 1 αν είναι reserved, αλλιώς 0.
+*/
+int is_reserved_word(const char* name) {
+    const char* reserved[] = {"int","void","return","if","else","while","break","main","print","read","true","false", NULL};
+    for(int i=0; reserved[i]; i++)
+        if(strcmp(reserved[i], name)==0) return 1; // βρέθηκε στο πίνακα
+    return 0; // όχι reserved
+}
+
+/*Ελέγχει διαίρεση κατά το στάδιο κατασκευής εκφράσεων: παίρνει δύο operands (σύμβολα) και αν ο δεύτερος 
+έχει τιμή 0 τερματίζει με error (division by zero). Διαφορετικά δημιουργεί ένα προσωρινό symbol (tmp_div) 
+που αντιγράφει τα χαρακτηριστικά του πρώτου operand, το επισημαίνει ως disposable και επιστρέφει το νέο σύμβολο. 
+Απελευθερώνει (discard) τα input operands αν χρειάζεται.
+*/
+symbol *check_divop(symbol *opnd1, symbol *opnd2) {
+    if (!opnd1 || !opnd2) return NULL; // έλεγχος εγκυρότητας
+
+    // Έλεγχος διαίρεσης με 0
+    if (opnd2->timi == 0) {
+         fprintf(stderr, "\nDivision by zero!\n");
+         exit(1); // τερματίζουμε το πρόγραμμα
+    }
+
+    // Δημιουργία προσωρινού αποτελέσματος ως νέο symbol
+    symbol *res = new_symbol("tmp_div");
+    copy_symbol(res, opnd1);    // αντιγράφουμε εκείνα που χρειάζεται από opnd1
+    res->disposable = 1;        // θα απελευθερωθεί αργότερα
+    res->lvalue = 0;            // αποτέλεσμα έκφρασης => όχι lvalue
+
+    // Απελευθερώνουμε τα αρχικά operands αν ήταν disposable
+    discard_symbol(opnd1);
+    discard_symbol(opnd2);
+
+    return res; // επιστρέφουμε το προσωρινό σύμβολο ως αποτέλεσμα
+}
+
+/*Αναδρομικά διασχίζει το AST και ελέγχει ότι κάθε μεταβλητή (N_ID) που χρησιμοποιείται 
+υπάρχει δηλωμένη στο αντίστοιχο scope (βασιζόμενο στο current_scope). Αν βρει ID χωρίς 
+αντίστοιχο σύμβολο στο symbol table, εκτυπώνει προειδοποίηση/σφάλμα και τερματίζει. Επιπλέον 
+ελέγχει ότι δεν χρησιμοποιείται κάποιο reserved word ως όνομα μεταβλητής.
+*/
+void check_undeclared_variables(AstNode* node, const char* current_scope) {
+    if (!node) return;
+
+    switch (node->NodeType) {
+        case N_METH: {
+            // Όταν βλέπουμε μέθοδο, η μέθοδος έχει δικό της scope (το όνομά της)
+            symbol* method_sym = node->pAstNode[1]->SymbolNode;
+            const char* method_scope = method_sym->name;
+
+            // Έλεγχος του σώματος της μεθόδου στο scope της μεθόδου
+            check_undeclared_variables(node->pAstNode[3], method_scope);
+            break;
+        }
+        case N_ID: {
+            // Ελέγχουμε αν το ID υπάρχει στο symbol table για το τρέχον scope
+            symbol* s = node->SymbolNode;
+            if (s && !findsymb(s->name, current_scope)) {
+                fprintf(stderr, "Warning: Variable '%s' used but not declared in scope '%s'\n", s->name, current_scope);
+                exit(1); // απλό παράδειγμα: εδώ κάνουμε exit (μπορεί να θέλεις μόνο warning)
+            }
+            // Έλεγχος αν χρησιμοποιείται δεσμευμένη λέξη ως μεταβλητή
+            if (s && is_reserved_word(s->name)) {
+                fprintf(stderr, "Error: Reserved word '%s' used as variable in scope '%s'\n", s->name, current_scope);
+                exit(1);
+            }
+            break;
+        }
+        default: {
+            // Γενική αναδρομή σε όλα τα παιδιά
+            for (int i = 0; i < 4; i++) {
+                check_undeclared_variables(node->pAstNode[i], current_scope);
+            }
+            break;
+        }
+    }
+}
+
+
+/*Ελέγχει αν υπάρχει στη ρίζα/στο δέντρο κάποια συνάρτηση με όνομα "main". 
+Επιστρέφει 1 αν βρεθεί, αλλιώς 0. Κάνει αναδρομή σε όλα τα παιδιά.
+*/
+int find_main(AstNode* node) {
+    if (!node) return 0;
+
+    // Εάν είναι κόμβος μεθόδου, έλεγξε το όνομα της μεθόδου
+    if (node->NodeType == N_METH) {
+        AstNode* idNode = node->pAstNode[1]; // το ID της μεθόδου
+        if (idNode && idNode->NodeType == N_ID && idNode->SymbolNode) {
+            if (strcmp(idNode->SymbolNode->name, "main") == 0) {
+                return 1; // Βρήκαμε main
+            }
+        }
+    }
+
+    // Αναδρομικός έλεγχος σε όλα τα παιδιά
+    for (int i = 0; i < 4; i++) {
+        if (find_main(node->pAstNode[i])) return 1;
+    }
+
+    return 0; // δεν βρέθηκε main πουθενά
+}
+
+
+/*Μετράει αναδρομικά τον αριθμό των ορισμάτων (arguments) που δίνονται σε μια κλήση 
+με βάση τη δομή κόμβου N_ARGS. Επιστρέφει 0 αν δεν υπάρχουν ορίσματα.
+*/
+int count_arguments(AstNode *args_node) {
+    if (!args_node) return 0;
+
+    switch (args_node->NodeType) {
+        case N_ARGS:
+            // Προσθέτουμε 1 για το τρέχον argument και επαναλαμβάνουμε για τα προηγούμενα
+            return 1 + count_arguments(args_node->pAstNode[0]);
+        default:
+            return 0;
+    }
+}
+
+/*Η συνάρτηση count_parameters μετράει πόσες παραμέτρους έχει μια μέθοδος, με βάση τον κόμβο του AST. 
+Δουλεύει αναδρομικά: ξεκινά από τον κόμβο της πρώτης παραμέτρου και προχωράει προς τα πίσω (μέσω των παιδιών του AST), 
+μετρώντας κάθε φορά που βρίσκει κόμβο τύπου N_PARAM ή N_FORMALS. Επιστρέφει έναν ακέραιο με το πλήθος των παραμέτρων. 
+Αν ο κόμβος είναι NULL ή δεν έχει άλλες παραμέτρους, επιστρέφει 0.
+*/
+int count_parameters(AstNode *params_node) {
+    // Αν δεν υπάρχει καθόλου κόμβος (δηλ. δεν υπάρχουν παράμετροι)
+    if (!params_node) return 0;
+
+    // Ελέγχουμε αν ο κόμβος είναι παράμετρος (N_PARAM) ή λίστα παραμέτρων (N_FORMALS)
+    if (params_node->NodeType == N_PARAM || params_node->NodeType == N_FORMALS) {
+        
+        // Αν υπάρχει τρίτο παιδί (δηλ. το ID της παραμέτρου υπάρχει)
+        // τότε μετράμε +1 για αυτήν την παράμετρο και συνεχίζουμε αναδρομικά
+        if (params_node->pAstNode[2] != NULL){ 
+            return count_parameters(params_node->pAstNode[0]) + 1;
+        }
+    }
+
+    // Σε κάθε άλλη περίπτωση δεν υπάρχουν παράμετροι
+    return 0;  
+}
+
+/*Ελέγχει ότι κάθε κλήση μεθόδου (N_CALL) αναφέρεται σε ορισμένη μέθοδο που υπάρχει 
+στο SymbolTable (στο global scope). Επίσης συγκρίνει τον αριθμό των παραμέτρων που 
+δόθηκαν με τον αριθμό που δηλώθηκε (p->num_params) και πετά σφάλμα αν δεν ταιριάζουν.
+Καλεί αναδρομικά για όλα τα παιδιά.
+*/
+void check_method_calls(AstNode* node) {
+    if (!node) return;
+
+    if (node->NodeType == N_CALL) {
+        AstNode* methodNode = node->pAstNode[0]; // METHOD
+        if (methodNode && methodNode->NodeType == N_METHOD) {
+            symbol* s = methodNode->SymbolNode; // όνομα μεθόδου
+            if (s && !findsymb(s->name, "global")) {
+                fprintf(stderr, "Error: Call to undefined method '%s'\n", s->name);
+                fflush(stderr);
+                exit(1);
+            }
+            // Βρίσκουμε την δήλωση της μεθόδου στο global symbol table
+            symbol* p = findsymb(s->name, "global");
+            AstNode* argsNode   = node->pAstNode[1]; // Actuals
+            int given_args = count_arguments(argsNode);
+
+            // Έλεγχος αριθμού παραμέτρων
+            if (p->num_params != given_args) {
+                fprintf(stderr,
+                    "Error: Method '%s' expects %d parameters but got %d\n",
+                    p->name, p->num_params, given_args);
+                fflush(stderr);
+                exit(1);
+            }
+        }
+    }
+
+    // Αναδρομική επίσκεψη όλων των παιδιών
+    for (int i = 0; i < 4; i++)
+        check_method_calls(node->pAstNode[i]);
+}
+
+
+/*Ελέγχει ότι κάθε break στο πρόγραμμα βρίσκεται εντός ενός while. Η συνάρτηση παίρνει 
+ένα flag insideWhile που μεταδίδεται στην αναδρομή — όταν βρεθεί break και το flag είναι 0, 
+θεωρείται λάθος. Όταν δει N_WHILE, καλεί τα παιδιά με insideWhile = 1.
+*/
+void check_breaks(AstNode* node, int insideWhile) {
+    if (!node) return;
+
+    // Εάν είναι κόμβος while, τότε το περιβάλλον για τα παιδιά του είναι "μέσα σε while"
+    if (node->NodeType == N_WHILE) {
+        for (int i = 0; i < 4; i++) {
+            check_breaks(node->pAstNode[i], 1); // είμαστε μέσα σε while τώρα
+        }
+        return;
+    }
+
+    // Αν είναι break και δεν είμαστε μέσα σε while -> λάθος
+    if (node->NodeType == N_BREAK) {
+        if (!insideWhile) {
+            fprintf(stderr, "Error: 'break' outside of while!\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Αναδρομή στα παιδιά με το ίδιο insideWhile flag
+    for (int i = 0; i < 4; i++) {
+        check_breaks(node->pAstNode[i], insideWhile);
+    }
+}
+
+//Κάνει χρήση της find_main για να βεβαιωθεί ότι υπάρχει συνάρτηση main στο AST. Αν δεν βρεθεί, τερματίζει με error.
+void check_main_exists(AstNode* root) {
+    if (!find_main(root)) {
+        fprintf(stderr, "Error: no 'main' function found!\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+
+/*Εκτελεί τη διαδικασία parsing (yyparse()), ελέγχει αν το AST δημιουργήθηκε, 
+χτίζει τον πίνακα συμβόλων (build_symbol_table), εκτελεί σειρά από static checks 
+(ύπαρξη main, σωστή χρήση break, έλεγχος μη δηλωμένων μεταβλητών, έλεγχος κλήσεων μεθόδων), 
+τρέχει traverse για εμφάνιση AST και τυπώνει τον πίνακα συμβόλων.
+*/
+int main(void) {
+    yyparse(); // Εκτελούμε τον parser (ο parser γεμίζει το TreeRoot)
+    if(TreeRoot == NULL) {
+        
+    } else {
+        
+    // 1) Κατασκευή του symbol table ξεκινώντας από το global scope
+    build_symbol_table(TreeRoot, "global");
+
+    // 2) Έλεγχος ότι υπάρχει main
+    check_main_exists(TreeRoot);
+
+    // 3) Έλεγχος σωστής χρήσης του break
+    check_breaks(TreeRoot, 0);
+
+    // 4) Έλεγχος για μη δηλωμένες μεταβλητές (global scope)
+    check_undeclared_variables(TreeRoot, "global");
+
+    // 5) Έλεγχος κλήσεων μεθόδων (ύπαρξη + αριθμός παραμέτρων)
+    check_method_calls(TreeRoot);
+
+    // 6) Traversal / προβολή AST
+    traverse(TreeRoot, 0);
+
+    // 7) Εκτύπωση symbol table 
+    print_symbol_table();
+    }
+
+    
+}

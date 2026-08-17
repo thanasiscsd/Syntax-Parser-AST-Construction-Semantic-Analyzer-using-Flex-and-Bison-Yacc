@@ -1,0 +1,445 @@
+{\rtf1\ansi\ansicpg1252\deff0\nouicompat\deflang2057{\fonttbl{\f0\fnil\fcharset161 Calibri;}{\f1\fnil Calibri;}{\f2\fnil\fcharset0 Calibri;}{\f3\fnil\fcharset2 Symbol;}}
+{\*\generator Riched20 10.0.19041}\viewkind4\uc1 
+\pard\sa200\sl276\slmult1\qc\b\f0\fs56\lang1032\'d0\'e1\'f1\'e1\'e4\'e5\'df\'e3\'ec\'e1\'f4\'e1 \'ea\'e1\'e9 \'c1\'f0\'ef\'f4\'e5\'eb\'dd\'f3\'ec\'e1\'f4\'e1 \'cc\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2\par
+\par
+
+\pard\sa200\sl276\slmult1\fs36\'d0\'e1\'f1\'dc\'e4\'e5\'e9\'e3\'ec\'e1 1 \f1\endash  \f0\'d3\'f5\'ed\'f4\'e1\'ea\'f4\'e9\'ea\'fc \'eb\'dc\'e8\'ef\'f2\par
+\b0\fs22\'d0\'f1\'fc\'e3\'f1\'e1\'ec\'ec\'e1 (testlex1.txt):\par
+\b int method1(int a)\{\par
+    int b;\par
+    b = a+10;\par
+    return b;\par
+\}\par
+int main()\{\par
+    return method1(5+)\par
+\}\par
+\b0\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2:\par
+\b syntax error\b0\par
+\'d3\'f4\'ef \'f3\'f5\'e3\'ea\'e5\'ea\'f1\'e9\'ec\'dd\'ed\'ef \'f0\'f1\'fc\'e3\'f1\'e1\'ec\'ec\'e1 \'e7 \'f0\'e1\'f1\'dc\'f3\'f4\'e1\'f3\'e7 5+) \'f0\'e5\'f1\'e9\'dd\'f7\'e5\'e9 \'f3\'f5\'ed\'f4\'e1\'ea\'f4\'e9\'ea\'fc \'f3\'f6\'dc\'eb\'ec\'e1, \'f4\'ef \'ef\'f0\'ef\'df\'ef \'e5\'ed\'f4\'ef\'f0\'df\'f3\'f4\'e7\'ea\'e5 \'e5\'f0\'e9\'f4\'f5\'f7\'fe\'f2 \'e1\'f0\'fc \'f4\'ef\'ed \'e1\'ed\'e1\'eb\'f5\'f4\'de.\par
+\par
+\par
+\b\fs36\'d0\'e1\'f1\'dc\'e4\'e5\'e9\'e3\'ec\'e1 2 \f1\endash  \f0\'d3\'f5\'ed\'f4\'e1\'ea\'f4\'e9\'ea\'fc \'eb\'dc\'e8\'ef\'f2\b0\fs22\par
+\'d0\'f1\'fc\'e3\'f1\'e1\'ec\'ec\'e1 (testlex2.txt):\par
+\b int method1(int a)\{\par
+    int b;\par
+    b = ((a+10)-10)*5)\par
+\}\par
+\b0\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2:\par
+\b syntax error\b0\par
+\'c7 \'e5\'f3\'f6\'e1\'eb\'ec\'dd\'ed\'e7 \'f7\'f1\'de\'f3\'e7 \'f0\'e1\'f1\'e5\'ed\'e8\'dd\'f3\'e5\'f9\'ed \'ef\'e4\'e7\'e3\'e5\'df \'f3\'e5 \'f3\'f5\'ed\'f4\'e1\'ea\'f4\'e9\'ea\'fc \'f3\'f6\'dc\'eb\'ec\'e1, \'f4\'ef \'ef\'f0\'ef\'df\'ef \'e1\'ed\'e9\'f7\'ed\'e5\'fd\'e8\'e7\'ea\'e5 \'e1\'f0\'fc \'f4\'ef\'ed compiler.\par
+\par
+\par
+\b\fs36\'d0\'e1\'f1\'dc\'e4\'e5\'e9\'e3\'ec\'e1 3 \f1\endash  \f0\'d7\'f1\'de\'f3\'e7 while \'ea\'e1\'e9 break\b0\fs22\par
+\'d0\'f1\'fc\'e3\'f1\'e1\'ec\'ec\'e1 (testlex3.txt):\par
+\b int method1(int a)\{\par
+    int b;\par
+    b=0;\par
+    while( a>0 )\{\par
+        b = (a+10);\par
+        a = (a-1);\par
+        break;\par
+    \}\par
+    return b;\par
+\}\par
+int main()\{\par
+    return method1(5);\par
+\}\par
+\b0\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2 (AST):\par
+\b PROGRAM\par
+  METHLIST\par
+    METH\par
+      TYPE\par
+      ID: method1\par
+      PARAM\par
+        TYPE\par
+        ID: a\par
+      BODY\par
+        DECLS\par
+          DECL\par
+            TYPE\par
+            ID: b\par
+        STMTS\par
+          STMTS\par
+            STMTS\par
+              ASSIGN\par
+                ASSIGN\par
+                  ID: b\par
+                  CONST: 0\par
+            WHILE\par
+              RELOP\par
+                ID: a\par
+                GT\par
+                CONST: 0\par
+              BLOCK\par
+                STMTS\par
+                  STMTS\par
+                    STMTS\par
+                      ASSIGN\par
+                        ASSIGN\par
+                          ID: b\par
+                          ADDOP\par
+                            ID: a\par
+                            PLUS\par
+                            CONST: 10\par
+                    ASSIGN\par
+                      ASSIGN\par
+                        ID: a\par
+                        ADDOP\par
+                          ID: a\par
+                          MINUS\par
+                          CONST: 1\par
+                  BREAK\par
+          RETURN\par
+            ID: b\par
+    METH\par
+      TYPE\par
+      ID: main\par
+      BODY\par
+        STMTS\par
+          RETURN\par
+            CALL\par
+              METHOD\par
+              ARGS\par
+                CONST: 5\par
+\b0\'d0\'df\'ed\'e1\'ea\'e1\'f2 \'d3\'f5\'ec\'e2\'fc\'eb\'f9\'ed (Symbol Table):\par
+\b Scope: global     | Name: method1    | Type: int  | Value: -1\par
+ Scope: method1   | Name: a          | Type: int  | Value: 0\par
+ Scope: method1   | Name: b          | Type: int  | Value: 0\par
+ Scope: global    | Name: main       | Type: int  | Value: -1\par
+\b0\'d4\'ef \'f0\'f1\'fc\'e3\'f1\'e1\'ec\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'f9\'f4\'f4\'df\'f3\'f4\'e7\'ea\'e5 \'e5\'f0\'e9\'f4\'f5\'f7\'fe\'f2\par
+\par
+\par
+\b\fs36\'d0\'e1\'f1\'dc\'e4\'e5\'e9\'e3\'ec\'e1 4 \f1\endash  \f0\'c5\'ea\'f6\'f1\'dc\'f3\'e5\'e9\'f2 \'ec\'e5 \'f0\'f1\'dc\'ee\'e5\'e9\'f2\b0\fs22\par
+\'d0\'f1\'fc\'e3\'f1\'e1\'ec\'ec\'e1 (testlex4.txt):\par
+\b int method1(int a)\{\par
+    int b;\par
+    b = ((a+10)-10)*5/5;\par
+    return b;\par
+\}\par
+int main()\{\par
+    int a=5;\par
+    return method1(a);\par
+\}\b0\par
+\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2 (AST):\par
+\b PROGRAM\par
+  METHLIST\par
+    METH\par
+      TYPE\par
+      ID: method1\par
+      PARAM\par
+        TYPE\par
+        ID: a\par
+      BODY\par
+        DECLS\par
+          DECL\par
+            TYPE\par
+            ID: b\par
+        STMTS\par
+          STMTS\par
+            ASSIGN\par
+              ASSIGN\par
+                ID: b\par
+                DIV\par
+                  MUL\par
+                    ADDOP\par
+                      ADDOP\par
+                        ID: a\par
+                        PLUS\par
+                        CONST: 10\par
+                      MINUS\par
+                      CONST: 10\par
+                    CONST: 5\par
+                  CONST: 5\par
+          RETURN\par
+            ID: b\par
+    METH\par
+      TYPE\par
+      ID: main\par
+      BODY\par
+        DECLS\par
+          DECL\par
+            TYPE\par
+            ID: a\par
+            CONST: 5\par
+        STMTS\par
+          RETURN\par
+            CALL\par
+              METHOD\par
+              ARGS\par
+                ID: a\par
+\b0\'d0\'df\'ed\'e1\'ea\'e1\'f2 \'d3\'f5\'ec\'e2\'fc\'eb\'f9\'ed (Symbol Table):\par
+\b Scope: global     | Name: method1    | Type: int  | Value: -1\par
+ Scope: method1   | Name: a          | Type: int  | Value: 0\par
+ Scope: method1   | Name: b          | Type: int  | Value: 0\par
+ Scope: global    | Name: main       | Type: int  | Value: -1\par
+ Scope: main      | Name: a          | Type: int  | Value: 5\par
+\b0\'d4\'ef \'f0\'f1\'fc\'e3\'f1\'e1\'ec\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'f9\'f4\'f4\'df\'f3\'f4\'e7\'ea\'e5 \'e5\'f0\'e9\'f4\'f5\'f7\'fe\'f2\par
+\b\f2\lang9\par
+\fs36\par
+\f0\lang1032\'d0\'e1\'f1\'dc\'e4\'e5\'e9\'e3\'ec\'e1 5 \f1\endash  \f0\'ca\'eb\'de\'f3\'e7 \'ec\'e5\'e8\'fc\'e4\'f9\'ed\fs22\par
+\b0\'d0\'f1\'fc\'e3\'f1\'e1\'ec\'ec\'e1 (testlex5.txt):\b\par
+int method1(int a)\{\par
+    int b;\par
+    b = a +10;\par
+    return b;\par
+\}\par
+int method2(int c, int d)\{\par
+    int e;\par
+    e = method1(c);\par
+    e = e + d;\par
+    return e;\par
+\}\par
+int main()\{\par
+    return method2(5,6);\par
+\}\par
+\b0\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2 (AST):\b\f2\lang9\par
+\f0\lang1032 PROGRAM\par
+  METHLIST\par
+    METH\par
+      TYPE\par
+      ID: method1\par
+      PARAM\par
+        TYPE\par
+        ID: a\par
+      BODY\par
+        DECLS\par
+          DECL\par
+            TYPE\par
+            ID: b\par
+        STMTS\par
+          STMTS\par
+            ASSIGN\par
+              ASSIGN\par
+                ID: b\par
+                ADDOP\par
+                  ID: a\par
+                  PLUS\par
+                  CONST: 10\par
+          RETURN\par
+            ID: b\par
+    METHLIST\par
+      METH\par
+        TYPE\par
+        ID: method2\par
+        PARAM\par
+          FORMALS\par
+            TYPE\par
+            ID: c\par
+          TYPE\par
+          ID: d\par
+        BODY\par
+          DECLS\par
+            DECL\par
+              TYPE\par
+              ID: e\par
+          STMTS\par
+            STMTS\par
+              STMTS\par
+                ASSIGN\par
+                  ASSIGN\par
+                    ID: e\par
+                    CALL\par
+                      METHOD\par
+                      ARGS\par
+                        ID: c\par
+              ASSIGN\par
+                ASSIGN\par
+                  ID: e\par
+                  ADDOP\par
+                    ID: e\par
+                    PLUS\par
+                    ID: d\par
+            RETURN\par
+              ID: e\par
+      METH\par
+        TYPE\par
+        ID: main\par
+        BODY\par
+          STMTS\par
+            RETURN\par
+              CALL\par
+                METHOD\par
+                ARGS\par
+                  ARGS\par
+                    CONST: 5\par
+                  CONST: 6\par
+\b0\'d0\'df\'ed\'e1\'ea\'e1\'f2 \'d3\'f5\'ec\'e2\'fc\'eb\'f9\'ed (Symbol Table):\par
+\b Scope: global     | Name: method1    | Type: int  | Value: -1\par
+ Scope: method1    | Name: a          | Type: int  | Value: 0\par
+ Scope: method1    | Name: b          | Type: int  | Value: 0\par
+ Scope: global     | Name: method2    | Type: int  | Value: -1\par
+ Scope: method2    | Name: d          | Type: int  | Value: 0\par
+ Scope: method2    | Name: c          | Type: int  | Value: 0\par
+ Scope: method2    | Name: e          | Type: int  | Value: 0\par
+ Scope: global     | Name: main       | Type: int  | Value: -1\par
+\b0\'d4\'ef \'f0\'f1\'fc\'e3\'f1\'e1\'ec\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'f9\'f4\'f4\'df\'f3\'f4\'e7\'ea\'e5 \'e5\'f0\'e9\'f4\'f5\'f7\'fe\'f2, \'ef\'e9 \'ec\'dd\'e8\'ef\'e4\'ef\'e9 method1, method2 \'ea\'e1\'e9 main \'e1\'ed\'e1\'e3\'ed\'f9\'f1\'df\'f3\'f4\'e7\'ea\'e1\'ed \'ea\'e1\'e9 \'e1\'f0\'ef\'e8\'e7\'ea\'e5\'fd\'f4\'e7\'ea\'e1\'ed \'f3\'f9\'f3\'f4\'dc \'f3\'f4\'ef\'ed \'f0\'df\'ed\'e1\'ea\'e1 \'f3\'f5\'ec\'e2\'fc\'eb\'f9\'ed.\par
+\f2\lang2057\par
+\b\f0\fs36\lang1032\'d0\'c1\'d1\'c1\'c4\'c5\'c9\'c3\'cc\'c1 6-\'c4\'c9\'c1\'c9\'d1\'c5\'d3\'c7 \'cc\'c5 \'d4\'cf 0\par
+\fs22 int method1(int a)\par
+\{\par
+int b;\par
+int c=0;\par
+b = a +10;\par
+return b/c;\par
+\}\par
+int method2(int c, int d)\par
+\{\par
+int e;\par
+e = method1(c);\par
+e = e + d;\par
+return e;\par
+\}\par
+int main()\par
+\{\par
+return method2(5,6);\par
+\}\par
+\b0\par
+\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2:\par
+\b Division by zero!\par
+\par
+\fs36\'d0\'c1\'d1\'c1\'c4\'c5\'c9\'c3\'cc\'c1 7- \'d7\'d1\'c7\'d3\'c7 \'cc\'c7 \'c4\'c7\'cb\'d9\'cc\'c5\'cd\'c7\'d3 \'cc\'c5\'d4\'c1\'c2\'cb\'c7\'d4\'c7\'d3\par
+\fs22 int method1(int a)\par
+\{\par
+int b;\par
+b = a +10;\par
+return b+c;\par
+\}\par
+int method2(int c, int d)\par
+\{\par
+int e;\par
+e = method1(c);\par
+e = e + d;\par
+return e;\par
+\}\par
+int main()\par
+\{\par
+return method2(5,6);\par
+\}\par
+\par
+\b0\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2:\par
+\b Warning: Variable 'c' used but not declared in scope 'method1'\par
+\par
+\fs36\'d0\'c1\'d1\'c1\'c4\'c5\'c9\'c3\'cc\'c1 \f2\lang2057 8\f0\lang1032 - \'c4\'c9\'d0\'cb\'c7 \'c4\'c7\'cb\'d9\'d3\'c7 \'cc\'c5\'d4\'c1\'c2\'cb\'c7\'d4\'c7\'d3\fs22\par
+\b0\par
+\b int method1(int a)\par
+\{\par
+int b;\par
+b = a +10;\par
+return b;\par
+\}\par
+int method2(int c, int d)\par
+\{\par
+int e;\par
+int c;\par
+e = method1(c);\par
+e = e + d;\par
+return e;\par
+\}\par
+int main()\par
+\{\par
+return method2(5,6);\par
+\}\par
+\par
+\b0\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2:\par
+\b Error: Double declaration of variable 'c' in scope 'method2'\par
+\b0\par
+\par
+\b\fs36\'d0\'c1\'d1\'c1\'c4\'c5\'c9\'c3\'cc\'c1 \f2\lang2057 9\f0\lang1032 - \'d7\'d1\'c7\'d3\'c7 \'cc\'c7 \'d5\'d0\'c1\'d1\'d7\'cf\'d5\'d3\'c1\'d3 \'cc\'c5\'c8\'cf\'c4\'cf\'d5\par
+\line\fs22 int method1(int a)\par
+\{\par
+int b;\par
+b = a +10;\par
+return b;\par
+\}\par
+int method2(int c, int d)\par
+\{\par
+int e;\par
+e = method1(c);\par
+e = e + d;\par
+return e;\par
+\}\par
+int main()\par
+\{\par
+return method222(5,6);\par
+\}\par
+\b0\par
+\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2:\par
+\b Error: Call to undefined method 'method222'\par
+\par
+\fs36\'d0\'c1\'d1\'c1\'c4\'c5\'c9\'c3\'cc\'c1 10- \'c5\'cb\'cb\'c5\'c9\'d8\'c7 \'cc\'c5\'c8\'cf\'c4\'cf\'d5 \'cc\'c1\'c9\'cd\par
+\par
+\fs22 int method1(int a)\par
+\{\par
+int b;\par
+b = a +10;\par
+return b;\par
+\}\par
+int method2(int c, int d)\par
+\{\par
+int e;\par
+e = method1(c);\par
+e = e + d;\par
+return e;\par
+\}\par
+\par
+\b0\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2:\par
+\b Error: no 'main' function found!\par
+\par
+\fs36\'d0\'c1\'d1\'c1\'c4\'c5\'c9\'c3\'cc\'c1 11- \'d3\'d6\'c1\'cb\'cc\'c1 \'c1\'cd\'d4\'c9\'d3\'d4\'cf\'c9\'d7\'c9\'c1\'d3 \'cf\'d1\'c9\'d3\'cc\'c1\'d4\'d9\'cd/\'d0\'c1\'d1\'c1\'cc\'c5\'d4\'d1\'d9\'cd\par
+\par
+\fs22 int method1(int a)\par
+\{\par
+int b;\par
+b = a +10;\par
+return b;\par
+\}\par
+int method2(int c, int d)\par
+\{\par
+int e;\par
+e = method1(c);\par
+e = e + d;\par
+return e;\par
+\}\par
+int main()\par
+\{\par
+return method2(6);\par
+\}\par
+\par
+\b0\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2:\b\par
+Error: Method 'method2' expects 2 parameters but got 1\par
+\par
+\fs36\'d0\'c1\'d1\'c1\'c4\'c5\'c9\'c3\'cc\'c1 12- \'c5\'cd\'d4\'cf\'cb\'c7 \f2\lang2057 BREAK \f0\lang1032\'c5\'ca\'d4\'cf\'d3 \f2\lang2057 WHILE\f0\lang1032\par
+\par
+\fs22 int method1(int a)\par
+\{\par
+int b;\par
+b=0;\par
+while( a>0)\par
+\{\par
+b = (a+10);\par
+a = (a-1);\par
+\}\par
+break;\par
+return b;\par
+\}\par
+int main()\par
+\{\par
+return method1(5);\par
+\}\par
+\par
+\b0\'c1\'f0\'ef\'f4\'dd\'eb\'e5\'f3\'ec\'e1 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2:\b\par
+Error: 'break' outside of while!\par
+\par
+\par
+\fs36\'d3\'f5\'ec\'f0\'e5\'f1\'dc\'f3\'ec\'e1\'f4\'e1\par
+
+\pard{\pntext\f3\'B7\tab}{\*\pn\pnlvlblt\pnf3\pnindent0{\pntxtb\'B7}}\fi-360\li720\sa200\sl276\slmult1\b0\fs22\'c1\'f0\'fc \'f4\'e1 \'f0\'e1\'f1\'e1\'f0\'dc\'ed\'f9 \'f0\'e1\'f1\'e1\'e4\'e5\'df\'e3\'ec\'e1\'f4\'e1 \'f6\'e1\'df\'ed\'e5\'f4\'e1\'e9 \'fc\'f4\'e9 \'ef \'ec\'e5\'f4\'e1\'e3\'eb\'f9\'f4\'f4\'e9\'f3\'f4\'de\'f2 \'eb\'e5\'e9\'f4\'ef\'f5\'f1\'e3\'e5\'df \'ef\'f1\'e8\'dc \'f4\'fc\'f3\'ef \'f3\'e5 \'f0\'e5\'f1\'e9\'f0\'f4\'fe\'f3\'e5\'e9\'f2 \'dd\'e3\'ea\'f5\'f1\'ef\'f5 \'ea\'fe\'e4\'e9\'ea\'e1 \'fc\'f3\'ef \'ea\'e1\'e9 \'f3\'e5 \'f0\'e5\'f1\'e9\'f0\'f4\'fe\'f3\'e5\'e9\'f2 \'eb\'e1\'e8\'fe\'ed. \'d3\'f5\'e3\'ea\'e5\'ea\'f1\'e9\'ec\'dd\'ed\'e1:\par
+{\pntext\f3\'B7\tab}\'c1\'ed\'e9\'f7\'ed\'e5\'fd\'e5\'e9 \'ea\'e1\'e9 \'e1\'ed\'e1\'f6\'dd\'f1\'e5\'e9 \'ec\'e5 \'e1\'ea\'f1\'df\'e2\'e5\'e9\'e1 \'f3\'f5\'ed\'f4\'e1\'ea\'f4\'e9\'ea\'dc \'f3\'f6\'dc\'eb\'ec\'e1\'f4\'e1, \'fc\'f0\'f9\'f2 \'eb\'e1\'ed\'e8\'e1\'f3\'ec\'dd\'ed\'e5\'f2 \'e5\'ea\'f6\'f1\'dc\'f3\'e5\'e9\'f2 \'ea\'e1\'e9 \'e5\'f3\'f6\'e1\'eb\'ec\'dd\'ed\'e7 \'f7\'f1\'de\'f3\'e7 \'f0\'e1\'f1\'e5\'ed\'e8\'dd\'f3\'e5\'f9\'ed.\par
+{\pntext\f3\'B7\tab}\'c4\'e7\'ec\'e9\'ef\'f5\'f1\'e3\'e5\'df \'f3\'f9\'f3\'f4\'dc \'f4\'ef \'e1\'f6\'e7\'f1\'e7\'ec\'dd\'ed\'ef \'f3\'f5\'ed\'f4\'e1\'ea\'f4\'e9\'ea\'fc \'e4\'dd\'ed\'f4\'f1\'ef (AST), \'e1\'f0\'ef\'f4\'f5\'f0\'fe\'ed\'ef\'ed\'f4\'e1\'f2 \'f0\'e9\'f3\'f4\'dc \'f4\'e7 \'e4\'ef\'ec\'de \'f4\'ef\'f5 \'f0\'f1\'ef\'e3\'f1\'dc\'ec\'ec\'e1\'f4\'ef\'f2.\par
+{\pntext\f3\'B7\tab}\'ca\'e1\'f4\'e1\'f3\'ea\'e5\'f5\'dc\'e6\'e5\'e9 \'ea\'e1\'e9 \'e5\'ed\'e7\'ec\'e5\'f1\'fe\'ed\'e5\'e9 \'f4\'ef\'ed \'f0\'df\'ed\'e1\'ea\'e1 \'f3\'f5\'ec\'e2\'fc\'eb\'f9\'ed \'e3\'e9\'e1 \'ea\'dc\'e8\'e5 scope, \'e4\'e9\'e1\'f3\'f6\'e1\'eb\'df\'e6\'ef\'ed\'f4\'e1\'f2 \'fc\'f4\'e9 \'ef\'e9 \'ec\'e5\'f4\'e1\'e2\'eb\'e7\'f4\'dd\'f2 \'ea\'e1\'e9 \'ef\'e9 \'ec\'dd\'e8\'ef\'e4\'ef\'e9 \'e1\'ed\'e1\'e3\'ed\'f9\'f1\'df\'e6\'ef\'ed\'f4\'e1\'e9 \'ea\'e1\'e9 \'e5\'eb\'dd\'e3\'f7\'ef\'ed\'f4\'e1\'e9 \'f3\'f9\'f3\'f4\'dc.\par
+{\pntext\f3\'B7\tab}\'d5\'f0\'ef\'f3\'f4\'e7\'f1\'df\'e6\'e5\'e9 \'ea\'e1\'ed\'ef\'ed\'e9\'ea\'dc \'f4\'e9\'f2 \'ea\'eb\'de\'f3\'e5\'e9\'f2 \'ec\'e5\'e8\'fc\'e4\'f9\'ed, \'f4\'e9\'f2 \'e1\'f1\'e9\'e8\'ec\'e7\'f4\'e9\'ea\'dd\'f2 \'f0\'f1\'dc\'ee\'e5\'e9\'f2 \'ea\'e1\'e9 \'f4\'ef\'ed \'dd\'eb\'e5\'e3\'f7\'ef \'f1\'ef\'de\'f2 (while, break).\par
+{\pntext\f3\'B7\tab}\'c5\'ed\'f4\'ef\'f0\'df\'e6\'e5\'e9 \'f3\'f6\'dc\'eb\'ec\'e1\'f4\'e1 \'f7\'f1\'fc\'ed\'ef\'f5 \'ec\'e5\'f4\'e1\'e3\'eb\'fe\'f4\'f4\'e9\'f3\'e7\'f2, \'fc\'f0\'f9\'f2 \'e4\'e9\'e1\'df\'f1\'e5\'f3\'e7 \'ec\'e5 \'f4\'ef \'ec\'e7\'e4\'dd\'ed, \'f7\'f1\'de\'f3\'e7 \'ec\'e7 \'e4\'e7\'eb\'f9\'ec\'dd\'ed\'f9\'ed \'ec\'e5\'f4\'e1\'e2\'eb\'e7\'f4\'fe\'ed, \'e4\'e9\'f0\'eb\'dd\'f2 \'e4\'e7\'eb\'fe\'f3\'e5\'e9\'f2 \'ea\'e1\'e9 \'ea\'eb\'de\'f3\'e5\'e9\'f2 \'e1\'ed\'fd\'f0\'e1\'f1\'ea\'f4\'f9\'ed \'ec\'e5\'e8\'fc\'e4\'f9\'ed.\par
+{\pntext\f3\'B7\tab}\'d0\'e1\'f1\'dd\'f7\'e5\'e9 \'f0\'f1\'ef\'e5\'e9\'e4\'ef\'f0\'ef\'e9\'de\'f3\'e5\'e9\'f2 \'ea\'e1\'e9 \'ec\'e7\'ed\'fd\'ec\'e1\'f4\'e1 \'eb\'dc\'e8\'ef\'f5\'f2 \'f0\'ef\'f5 \'e2\'ef\'e7\'e8\'ef\'fd\'ed \'f4\'ef\'ed \'f0\'f1\'ef\'e3\'f1\'e1\'ec\'ec\'e1\'f4\'e9\'f3\'f4\'de \'ed\'e1 \'e4\'e9\'ef\'f1\'e8\'fe\'f3\'e5\'e9 \'dc\'ec\'e5\'f3\'e1 \'f4\'e1 \'f0\'f1\'ef\'e2\'eb\'de\'ec\'e1\'f4\'e1.\par
+{\pntext\f3\'B7\tab}\'d3\'f5\'ed\'ef\'eb\'e9\'ea\'dc, \'ef \'ec\'e5\'f4\'e1\'e3\'eb\'f9\'f4\'f4\'e9\'f3\'f4\'de\'f2 \'e1\'f0\'ef\'e4\'e5\'e9\'ea\'ed\'fd\'e5\'f4\'e1\'e9 \'e1\'ee\'e9\'fc\'f0\'e9\'f3\'f4\'ef\'f2 \'ea\'e1\'e9 \'f0\'eb\'de\'f1\'e7\'f2, \'ea\'e1\'eb\'fd\'f0\'f4\'ef\'ed\'f4\'e1\'f2 \'f4\'fc\'f3\'ef \'f4\'e7 \'f3\'f9\'f3\'f4\'de \'e1\'ed\'dc\'eb\'f5\'f3\'e7 \'ea\'e1\'e9 \'e1\'ed\'e1\'f0\'e1\'f1\'dc\'f3\'f4\'e1\'f3\'e7 \'f4\'ef\'f5 \'ea\'fe\'e4\'e9\'ea\'e1 \'fc\'f3\'ef \'ea\'e1\'e9 \'f4\'e7\'ed \'dd\'e3\'ea\'e1\'e9\'f1\'e7 \'e1\'ed\'e1\'e3\'ed\'fe\'f1\'e9\'f3\'e7 \'eb\'e1\'e8\'fe\'ed \'f0\'ef\'f5 \'e8\'e1 \'ec\'f0\'ef\'f1\'ef\'fd\'f3\'e1\'ed \'ed\'e1 \'ef\'e4\'e7\'e3\'de\'f3\'ef\'f5\'ed \'f3\'e5 \'f3\'f6\'dc\'eb\'ec\'e1\'f4\'e1 \'ea\'e1\'f4\'dc \'f4\'e7\'ed \'e5\'ea\'f4\'dd\'eb\'e5\'f3\'e7.\par
+}
+ 

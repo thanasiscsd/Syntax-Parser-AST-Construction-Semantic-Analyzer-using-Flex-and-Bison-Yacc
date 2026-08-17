@@ -1,0 +1,189 @@
+%{
+#include "y.tab.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "defs.h"
+
+
+/*Το συγκεκριμένο αρχείο αποτελεί τον λεξικό αναλυτή (scanner) του μεταγλωττιστή, ο οποίος έχει υλοποιηθεί με τη χρήση 
+του εργαλείου Flex. Ο ρόλος του είναι να διαβάζει τον πηγαίο κώδικα και να τον μετατρέπει σε μια ακολουθία από tokens, 
+δηλαδή τις βασικές λεκτικές μονάδες της γλώσσας προγραμματισμού (σταθερές, τελεστές, λέξεις–κλειδιά, ταυτοποιητές, σύμβολα κ.ά.). 
+Κάθε φορά που αναγνωρίζεται ένα token, το πρόγραμμα επιστρέφει την κατάλληλη τιμή στον συντακτικό αναλυτή (parser), 
+ο οποίος θα χρησιμοποιήσει αυτές τις πληροφορίες για να ελέγξει τη δομή του προγράμματος. Παράλληλα, ο λεξικός αναλυτής 
+αγνοεί σχόλια, κενά και αλλαγές γραμμής, έτσι ώστε να διευκολύνει την περαιτέρω επεξεργασία. Συνολικά, το αρχείο αυτό 
+αποτελεί το πρώτο στάδιο της διαδικασίας μετάφρασης, καθώς «καθαρίζει» τον κώδικα από περιττά στοιχεία και τον οργανώνει 
+σε μορφή κατανοητή για τα επόμενα στάδια του μεταγλωττιστή.*/
+
+
+
+#define N  9   // Αριθμός λέξεων–κλειδιών που υποστηρίζονται
+
+int id_or_keyword(char *s); // Συνάρτηση που ελέγχει αν ένα string είναι ταυτοποιητής ή λέξη–κλειδί
+%}
+
+%%
+
+"0" {
+       printf("%s", yytext);               // Εκτυπώνει το token που βρέθηκε
+       yylval.yint = atoi(yytext);         // Το αποθηκεύει ως ακέραιο στη δομή yylval
+       return(DEC_CONST);                  // Επιστρέφει τον τύπο DEC_CONST (σταθερά)
+     }
+
+"//".* { /* Σχόλιο μέχρι τέλος γραμμής */ }
+
+
+[1-9][0-9]* {
+       printf("%s", yytext);
+       yylval.yint = atoi(yytext);
+       return(DEC_CONST);
+     }
+
+
+"*" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);  
+       return('*');                    
+     }
+
+"/" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return('/');
+     }
+
+"+" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return('+');
+     }
+
+
+"-" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return('-');
+     }
+
+"=" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return('=');
+     }
+
+
+">=" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return(GE);
+     }
+
+
+"<=" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return(LE);
+     }
+
+
+"==" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return(EQ);
+     }
+
+"!=" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return(NE);
+     }
+
+
+">" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return('>');
+     }
+
+
+"<" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return('<');
+     }
+
+
+"(" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return('(');
+     }
+
+")" {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return(')');
+     }
+
+
+"{" {
+       printf("%s\n", yytext);
+       yylval.ystr = strdup(yytext);
+       return('{');
+     }
+
+"}" {
+       printf("%s\n", yytext);
+       yylval.ystr = strdup(yytext);
+       return('}');
+     }
+
+
+"," {
+       printf("%s", yytext);
+       yylval.ystr = strdup(yytext);
+       return(',');
+     }
+
+
+";" {
+       printf("%s\n", yytext);
+       yylval.ystr = strdup(yytext);
+       return(';');
+     }
+
+
+[a-zA-Z]([a-zA-Z0-9_])* {
+       int i;
+       printf("%s", yytext);
+       i = id_or_keyword(yytext);     // Έλεγχος αν είναι λέξη–κλειδί
+       if(i == ID) 
+          yylval.ystr = strdup(yytext);  // Αν είναι ID, αποθηκεύεται ως string
+       else 
+          yylval.yint = i;               // Αν είναι keyword, επιστρέφει τον κωδικό του
+       return(i);
+     }
+
+
+[ \f\t]+ { printf(" "); }
+
+
+(\r\n|\r|\n)+ { printf(""); }
+
+%%
+
+
+static char *kid[N]={"if","else","while","break","return","int","true","false","void"};
+
+static int kval[N]={IF,ELSE,WHILE,BREAK,RETURN,INT,TRUE,FALSE,VOID};
+
+int id_or_keyword(char *s)
+{  
+   int i;
+   // Έλεγχος αν το s ταιριάζει με κάποια λέξη–κλειδί
+   for(i=0; (i < N) && (strcmp(s,kid[i]) != 0); i++);
+   if(i < N)
+      return kval[i];  // Επιστρέφει τον κωδικό της λέξης–κλειδί
+   else
+      return ID;       // Αλλιώς επιστρέφει ID (ταυτοποιητής)
+}
